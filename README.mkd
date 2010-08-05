@@ -1,0 +1,29 @@
+##Credomatic Payment Gateway for WP-e-Commerce
+Credomatic Payment Gateway is a basic implementation of the Credomatic Browser Redirect API
+
+Copyright, 2010 - Sebastian Oliva
+http://sebastianoliva.com
+
+Made at the request of http://royalestudios.com/
+
+
+It is free software, under the GNU AGPL licence, meaning that you are free to use it, study it, and modify it, with an important condition:
+* If you modify it, you must publish the changes made, to all users of the software
+This clause, however, can be waived under request, contact me for more info.
+
+##Usage
+Just copy gpCredomatic.php to your wp-content/plugins/wp-e-commerce/merchants and then edit the info on wp-e-commerce.
+
+For the ruby dummy server you'll need sinatra, and of course ruby
+
+##Legal Stuff
+
+This software is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License version 3
+as published by the Free Software Foundation.
+
