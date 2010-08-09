@@ -37,7 +37,6 @@ if(in_array('pagoCredomatic',(array)get_option('custom_gateway_options'))) {
 		<td class='wpsc_gpc_cc_number1'>Numero de Tarjeta: *</td>
 		<td class='wpsc_gpc_cc_number2'>
 			<input type='text' value='' name='card_number' />
-			<p class='validation-error'></p>
 		</td>
 	</tr>
 	<tr id='wpsc_gpc_cc_expiry'>
@@ -60,13 +59,32 @@ if(in_array('pagoCredomatic',(array)get_option('custom_gateway_options'))) {
 			<select class='wpsc_ccBox' name='expiry[year]'>
               ".$years."
 			</select>
-			<p class='validation-error'></p>
+		</td>
+	</tr>
+    <tr id='wpsc_gpc_cc_cvv'>
+		<td class='wpsc_gpc_cc_cvv1'>Numero de Verificaci&oacute;n: *</td>
+		<td class='wpsc_gpc_cc_cvv2'>
+			<input type='text' value='' name='cvv' />
 		</td>
 	</tr>
 ";
 }
 
 function gateway_pagoCredomatic($seperator, $sessionid){
+
+  //Adding extra protection against SQL Injection
+  if( !is_numeric($_POST['card_number'])    ||
+      !is_numeric($_POST['expiry']['year']) ||
+      !is_numeric($_POST['expiry']['month'])||
+      !is_numeric($_POST['cvv']))
+  {
+    $transact_url = get_option('checkout_url');
+    $_SESSION['wpsc_checkout_misc_error_messages'][] = __('La operacion fue fallida, entrada Invalida ');
+    $_SESSION['gpc'] = 'fail';
+    header("Location: ".get_option('transact_url').$seperator."sessionid=".$sessionid);
+    exit();
+  }
+
   global $wpdb, $wpsc_cart;
   $purchase_log = $wpdb->get_row("SELECT * FROM `".WPSC_TABLE_PURCHASE_LOGS."` WHERE `sessionid`= ".$sessionid." LIMIT 1",ARRAY_A) ;
   $usersql = "SELECT `".WPSC_TABLE_SUBMITED_FORM_DATA."`.value, `".WPSC_TABLE_CHECKOUT_FORMS."`.`name`, `".WPSC_TABLE_CHECKOUT_FORMS."`.`unique_name` FROM `".WPSC_TABLE_CHECKOUT_FORMS."` LEFT JOIN `".WPSC_TABLE_SUBMITED_FORM_DATA."` ON `".WPSC_TABLE_CHECKOUT_FORMS."`.id = `".WPSC_TABLE_SUBMITED_FORM_DATA."`.`form_id` WHERE  `".WPSC_TABLE_SUBMITED_FORM_DATA."`.`log_id`=".$purchase_log['id']." ORDER BY `".WPSC_TABLE_CHECKOUT_FORMS."`.`order`";
@@ -113,6 +131,7 @@ function gateway_pagoCredomatic($seperator, $sessionid){
 
   $t_ccNumber = $_POST['card_number'];
   $t_ccExp    = $_POST['expiry']['month'].$_POST['expiry']['year'];
+  $t_ccCvv     =$_POST['cvv'];
 
   $t_hash = md5("$t_item|$t_amount|$t_time|$mT_key");
 
@@ -129,6 +148,7 @@ function gateway_pagoCredomatic($seperator, $sessionid){
 
   $GC_purchaseData["ccnumber"]    = $t_ccNumber;
   $GC_purchaseData["ccexp"]       = $t_ccExp;
+    $GC_purchaseData["cvv"]       = $t_ccCvv;
 
   $GC_purchaseData["hash"]        = $t_hash;
 
