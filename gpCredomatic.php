@@ -145,30 +145,33 @@ function gateway_pagoCredomatic($seperator, $sessionid){
   $context = stream_context_create($params);
   $stream = @fopen($POSTURL, 'rb', false, $context); //making the actual request
 
-  $resultMetaData = stream_get_meta_data($stream);
+  if ($stream != false){ //added protection in case of an invalid request
 
-  fclose($stream);
+    $resultMetaData = stream_get_meta_data($stream);
 
-  $results = $resultMetaData["wrapper_data"];
+    fclose($stream);
 
-  $GC_resultVal = ""; //here we store the results
+    $results = $resultMetaData["wrapper_data"];
+
+    $GC_resultVal = ""; //here we store the results
 
 
-  foreach ($results as $element){
-    $splitArrays = explode (": ", $element); //we separate the HTTP Header in sections
-    //if the selected header is Location we store the results
-    if ($splitArrays[0] == "Location"){
-      $GC_resultVal = $splitArrays[1];
-      break;
+    foreach ($results as $element){
+      $splitArrays = explode (": ", $element); //we separate the HTTP Header in sections
+      //if the selected header is Location we store the results
+      if ($splitArrays[0] == "Location"){
+        $GC_resultVal = $splitArrays[1];
+        break;
+      }
     }
+
+
+    parse_str($GC_resultVal, $GC_ResultData);
+
+
+    $serverResponse = $GC_ResultData["http://localhost?response"]; //$GC_ResultData[get_option('mT_REDIRECTURL')."?response"]; //didn't actually work
+
   }
-
-
-  parse_str($GC_resultVal, $GC_ResultData);
-
-
-  $serverResponse = $GC_ResultData["http://localhost?response"]; //$GC_ResultData[get_option('mT_REDIRECTURL')."?response"]; //didn't actually work
-
 
   if($serverResponse == 1 && $GC_resultVal != ""){
       //redirect to  transaction page and store in DB as a order with accepted payment
