@@ -71,21 +71,34 @@ if(in_array('pagoCredomatic',(array)get_option('custom_gateway_options'))) {
 }
 
 function gateway_pagoCredomatic($seperator, $sessionid){
+  global $wpdb, $wpsc_cart;
 
-  //Adding extra protection against SQL Injection
+  $_POST['card_number'] = trim($_POST['card_number']);
+
+  //TODO: Void purchases with 999 and other well known numbers
+
+  //Adding extra protection against SQL Injection and killing invalid numbers
   if( !is_numeric($_POST['card_number'])    ||
       !is_numeric($_POST['expiry']['year']) ||
       !is_numeric($_POST['expiry']['month'])||
-      !is_numeric($_POST['cvv']))
+      !is_numeric($_POST['cvv'])            ||
+      $_POST['card_number'] == 1234567890   ||
+      $_POST['card_number'] == 0987654321   ||
+      $_POST['card_number'] == ""           ||
+      $_POST['cvv'] == ""                   
+    )
   {
+    $sql = "DELETE from `".WPSC_TABLE_PURCHASE_LOGS."` WHERE `sessionid` = ".$sessionid." LIMIT 1"; //Deleting the invalid transaction
+    $wpdb->query($sql);
+
     $transact_url = get_option('checkout_url');
-    $_SESSION['wpsc_checkout_misc_error_messages'][] = __('La operacion fue fallida, entrada Invalida ');
+    $_SESSION['wpsc_checkout_misc_error_messages'][] = __('La operaci&oacute;n fue fallida, entrada Inv&aacute;lida ');
     $_SESSION['gpc'] = 'fail';
     header("Location: ".get_option('transact_url').$seperator."sessionid=".$sessionid);
     exit();
   }
 
-  global $wpdb, $wpsc_cart;
+  
   $purchase_log = $wpdb->get_row("SELECT * FROM `".WPSC_TABLE_PURCHASE_LOGS."` WHERE `sessionid`= ".$sessionid." LIMIT 1",ARRAY_A) ;
   $usersql = "SELECT `".WPSC_TABLE_SUBMITED_FORM_DATA."`.value, `".WPSC_TABLE_CHECKOUT_FORMS."`.`name`, `".WPSC_TABLE_CHECKOUT_FORMS."`.`unique_name` FROM `".WPSC_TABLE_CHECKOUT_FORMS."` LEFT JOIN `".WPSC_TABLE_SUBMITED_FORM_DATA."` ON `".WPSC_TABLE_CHECKOUT_FORMS."`.id = `".WPSC_TABLE_SUBMITED_FORM_DATA."`.`form_id` WHERE  `".WPSC_TABLE_SUBMITED_FORM_DATA."`.`log_id`=".$purchase_log['id']." ORDER BY `".WPSC_TABLE_CHECKOUT_FORMS."`.`order`";
   //exit($usersql);
@@ -128,6 +141,8 @@ function gateway_pagoCredomatic($seperator, $sessionid){
     $t_item   .= $Item->product_name." ";
     $t_amount = $t_amount + number_format($Item->unit_price,2) * $Item->quantity;
   }
+
+  $t_item = htmlspecialchars($t_item);
 
   $t_ccNumber = $_POST['card_number'];
   $t_ccExp    = $_POST['expiry']['month'].$_POST['expiry']['year'];
@@ -195,8 +210,12 @@ function gateway_pagoCredomatic($seperator, $sessionid){
 
   if($serverResponse == 1 && $GC_resultVal != ""){
       //redirect to  transaction page and store in DB as a order with accepted payment
-      $sql = "UPDATE `".WPSC_TABLE_PURCHASE_LOGS."` SET `processed`= '2' WHERE `sessionid`=".$sessionid;
+      $sql = "UPDATE `".WPSC_TABLE_PURCHASE_LOGS."` set  `processed` = 2 WHERE `sessionid` = ".$sessionid." LIMIT 1";
       $wpdb->query($sql);
+      if(function_exists('wpsc_member_activate_subscriptions')){ //This bit here enables the auto aproval of the transaction
+        wpsc_member_activate_subscriptions($sessionid);
+      }
+
       $transact_url = get_option('transact_url');
       unset($_SESSION['WpscGatewayErrorMessage']);
       $_SESSION['gpc'] = 'success';
@@ -205,7 +224,9 @@ function gateway_pagoCredomatic($seperator, $sessionid){
   }
   else {
     //redirect back to checkout page with errors
-    $sql = "UPDATE `".WPSC_TABLE_PURCHASE_LOGS."` SET `processed`= '5' WHERE `sessionid`=".$sessionid;
+    //$sql = "UPDATE `".WPSC_TABLE_PURCHASE_LOGS."` set  `processed` = '5' WHERE `sessionid` = ".$sessionid." LIMIT 1";
+    $sql = "DELETE from `".WPSC_TABLE_PURCHASE_LOGS."` WHERE `sessionid` = ".$sessionid." LIMIT 1"; //Deleting the invalid transaction
+    
     $wpdb->query($sql);
     $transact_url = get_option('checkout_url');
     
