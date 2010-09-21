@@ -26,6 +26,7 @@ $nzshpcrt_gateways[$num]['submit_function'] = "submit_pagoCredomatic";
 if(in_array('pagoCredomatic',(array)get_option('custom_gateway_options'))) {
     //Generating the possible expire years for the card
 	$curryear = date('y');
+    $years = "";
 	for($i=0; $i < 10; $i++){
 		$years .= "<option value='".$curryear."'>20".$curryear."</option>\r\n";
 		$curryear++;
@@ -178,7 +179,7 @@ function gateway_pagoCredomatic($seperator, $sessionid){
             ));
 
   $context = stream_context_create($params);
-  $stream = @fopen($POSTURL, 'rb', false, $context); //making the actual request
+  $stream = @fopen($POSTURL, 'rw', false, $context); //making the actual request
 
   if ($stream != false){ //added protection in case of an invalid request
 
@@ -206,34 +207,41 @@ function gateway_pagoCredomatic($seperator, $sessionid){
 
     $serverResponse = $GC_ResultData["http://localhost?response"]; //$GC_ResultData[get_option('mT_REDIRECTURL')."?response"]; //didn't actually work
 
-  }
+  
 
-  if($serverResponse == 1 && $GC_resultVal != ""){
-      //redirect to  transaction page and store in DB as a order with accepted payment
-      $sql = "UPDATE `".WPSC_TABLE_PURCHASE_LOGS."` set  `processed` = 2 WHERE `sessionid` = ".$sessionid." LIMIT 1";
+    if($serverResponse == 1 && $GC_resultVal != ""){
+        //redirect to  transaction page and store in DB as a order with accepted payment
+        $sql = "UPDATE `".WPSC_TABLE_PURCHASE_LOGS."` set  `processed` = 2 WHERE `sessionid` = ".$sessionid." LIMIT 1";
+        $wpdb->query($sql);
+        if(function_exists('wpsc_member_activate_subscriptions')){ //This bit here enables the auto aproval of the transaction
+          wpsc_member_activate_subscriptions($sessionid);
+        }
+
+        $transact_url = get_option('transact_url');
+        unset($_SESSION['WpscGatewayErrorMessage']);
+        $_SESSION['gpc'] = 'success';
+        header("Location: ".get_option('transact_url').$seperator."sessionid=".$sessionid);
+        exit();
+    }
+    else {
+      //redirect back to checkout page with errors
+      //$sql = "UPDATE `".WPSC_TABLE_PURCHASE_LOGS."` set  `processed` = '5' WHERE `sessionid` = ".$sessionid." LIMIT 1";
+      $sql = "DELETE from `".WPSC_TABLE_PURCHASE_LOGS."` WHERE `sessionid` = ".$sessionid." LIMIT 1"; //Deleting the invalid transaction
+
       $wpdb->query($sql);
-      if(function_exists('wpsc_member_activate_subscriptions')){ //This bit here enables the auto aproval of the transaction
-        wpsc_member_activate_subscriptions($sessionid);
-      }
+      $transact_url = get_option('checkout_url');
 
-      $transact_url = get_option('transact_url');
-      unset($_SESSION['WpscGatewayErrorMessage']);
-      $_SESSION['gpc'] = 'success';
-      header("Location: ".get_option('transact_url').$seperator."sessionid=".$sessionid);
-      exit();
-  }
-  else {
-    //redirect back to checkout page with errors
-    //$sql = "UPDATE `".WPSC_TABLE_PURCHASE_LOGS."` set  `processed` = '5' WHERE `sessionid` = ".$sessionid." LIMIT 1";
-    $sql = "DELETE from `".WPSC_TABLE_PURCHASE_LOGS."` WHERE `sessionid` = ".$sessionid." LIMIT 1"; //Deleting the invalid transaction
-    
-    $wpdb->query($sql);
-    $transact_url = get_option('checkout_url');
-    
-    //if ($GC_ResultData["responsecode"] > 199 && $GC_ResultData["responsecode"] < 300)
-      $_SESSION['wpsc_checkout_misc_error_messages'][] = __('La operacion fue fallida, ningun cargo ha sido efectuado a su tarjeta.   ') . $GC_ResultData["responsetext"];
-    
+      //if ($GC_ResultData["responsecode"] > 199 && $GC_ResultData["responsecode"] < 300)
+        $_SESSION['wpsc_checkout_misc_error_messages'][] = __('La operacion fue fallida, ningun cargo ha sido efectuado a su tarjeta.   ') . $GC_ResultData["responsetext"];
+
+      $_SESSION['gpc'] = 'fail';
+    }
+  } //end of ($stream != false)
+  else{
+
+    $_SESSION['wpsc_checkout_misc_error_messages'][] = __(' Error en Conexion, no se efectuo la transaccion ') . $GC_ResultData["responsetext"];
     $_SESSION['gpc'] = 'fail';
+
   }
 }
 
