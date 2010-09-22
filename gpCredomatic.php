@@ -179,7 +179,8 @@ function gateway_pagoCredomatic($seperator, $sessionid){
             ));
 
   $context = stream_context_create($params);
-  $stream = @fopen($POSTURL, 'rw', false, $context); //making the actual request
+  $stream = fopen($POSTURL, 'r', false, $context); //making the actual request
+
 
   if ($stream != false){ //added protection in case of an invalid request
 
