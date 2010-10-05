@@ -110,6 +110,8 @@ function gateway_pagoCredomatic($seperator, $sessionid){
 
   $POSTURL = "https://credomatic.compassmerchantsolutions.com/api/transact.php";
   //$POSTURL = "http://localhost:4567/api/transact.php"; //Testing Gateway included as dummyServerTesting.rb
+ 
+  $MODE_FOPEN = false;
 
   //Preparing the data to be sent
 
@@ -164,34 +166,33 @@ function gateway_pagoCredomatic($seperator, $sessionid){
 
   $GC_purchaseData["ccnumber"]    = $t_ccNumber;
   $GC_purchaseData["ccexp"]       = $t_ccExp;
-    $GC_purchaseData["cvv"]       = $t_ccCvv;
+  $GC_purchaseData["cvv"]         = $t_ccCvv;
 
   $GC_purchaseData["hash"]        = $t_hash;
 
   //Creating the query string with the data
-  $t_constructedArgs = http_build_query($GC_purchaseData); 
+  $t_constructedArgs = http_build_query($GC_purchaseData);
+            
+  $GC_resultVal = false;
 
-  //print_r($t_constructedArgs);
-
-  $params = array('http' => array(
-              'method' => 'POST',
-              'content' => $t_constructedArgs
-            ));
-
-  $context = stream_context_create($params);
-  $stream = fopen($POSTURL, 'r', false, $context); //making the actual request
-
-
-  if ($stream != false){ //added protection in case of an invalid request
-
+  if ($MODE_FOPEN){ //FOPEN causes problems sometimes 
+                    //http://wezfurlong.org/blog/2006/nov/http-post-from-php-without-curl
+  
+    
+    //print_r($t_constructedArgs);
+    $params = array('http' => array(
+                'method' => 'POST',
+                'content' => $t_constructedArgs
+              ));
+  
+    $context = stream_context_create($params);
+    $stream = fopen($POSTURL, 'r', false, $context); //making the actual request
+    
     $resultMetaData = stream_get_meta_data($stream);
-
     fclose($stream);
-
     $results = $resultMetaData["wrapper_data"];
-
+    
     $GC_resultVal = ""; //here we store the results
-
 
     foreach ($results as $element){
       $splitArrays = explode (": ", $element); //we separate the HTTP Header in sections
@@ -201,14 +202,39 @@ function gateway_pagoCredomatic($seperator, $sessionid){
         break;
       }
     }
+  //end of MODE_FOPEN   
+  } else { // In case MODE_FOPEN is false, we use curl instead
+    $ch = curl_init ($POSTURL);
+    curl_setopt ($ch, CURLOPT_POST, true);
+    curl_setopt ($ch, CURLOPT_POSTFIELDS, $t_constructedArgs);
+    curl_setopt($ch, CURLOPT_USERAGENT, "WP e-Commerce");
+    curl_setopt ($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HEADER, true);
+    $returndata = curl_exec ($ch);
 
+
+    $returnLines = explode("\n", $returndata);
+
+    foreach ($returnLines as $element){
+      $splitArrays = explode (": ", $element); //we separate the HTTP Header in sections
+      //if the selected header is Location we store the results
+      if ($splitArrays[0] == "Location"){
+        $GC_resultVal = $splitArrays[1];
+        break;
+      }
+    }
+
+  }
+  
+  
+
+  if ($GC_resultVal){ //protection in case of a failed request
 
     parse_str($GC_resultVal, $GC_ResultData);
 
 
     $serverResponse = $GC_ResultData["http://localhost?response"]; //$GC_ResultData[get_option('mT_REDIRECTURL')."?response"]; //didn't actually work
-
-  
+ 
 
     if($serverResponse == 1 && $GC_resultVal != ""){
         //redirect to  transaction page and store in DB as a order with accepted payment
