@@ -86,7 +86,8 @@ function gateway_pagoCredomatic($seperator, $sessionid){
       $_POST['card_number'] == 1234567890   ||
       $_POST['card_number'] == 0987654321   ||
       $_POST['card_number'] == ""           ||
-      $_POST['cvv'] == ""                   
+      $_POST['cvv'] == ""                   ||
+      $_POST['expiry']['month'] < date('m')
     )
   {
     $sql = "DELETE from `".WPSC_TABLE_PURCHASE_LOGS."` WHERE `sessionid` = ".$sessionid." LIMIT 1"; //Deleting the invalid transaction
